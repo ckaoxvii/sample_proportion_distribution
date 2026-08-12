@@ -2,7 +2,6 @@ library(bslib)
 library(tidyverse)
 library(reactable)
 library(shiny)
-library(ggiraph)
 
 # Flagler color palette
 flagler_palette <- c(
@@ -184,7 +183,7 @@ ui <- page_sidebar(
         )
       ),
 
-      girafeOutput(
+      plotOutput(
         "distribution_plot",
         height = "400px"
       ),
@@ -382,247 +381,259 @@ server <- function(input, output, session) {
 
   # Display values for the info box
   output$pop_prop_display <- renderText({
-    round(
-      input$pop_prop,
-      3
-    )
+    round(input$pop_prop, 3)
   })
 
   output$sample_mean_display <- renderText({
-
     req(sample_props())
-
-    round(
-      mean(sample_props()),
-      3
-    )
+    round(mean(sample_props()), 3)
   })
 
-  # Create the main plot
-  output$distribution_plot <- renderGirafe({
+# Create the main plot
+output$distribution_plot <- renderPlot({
 
-    req(sample_props())
+  req(sample_props())
 
-    bin_width <- 1/input$sample_size
+  bin_width <- 1 / input$sample_size
 
-    hist_data <- hist(
-      sample_props(),
-      breaks = seq(-bin_width/2, 1 + bin_width/2, by = bin_width),
-      plot = FALSE
+  hist_data <- hist(
+    sample_props(),
+    breaks = seq(
+      -bin_width / 2,
+      1 + bin_width / 2,
+      by = bin_width
+    ),
+    plot = FALSE
+  )
+
+  plot_data <- tibble(
+    xmin = head(hist_data$breaks, -1),
+    xmax = tail(hist_data$breaks, -1),
+    frequency = hist_data$counts
+  )
+
+  max_count <- max(plot_data$frequency)
+
+  p <- ggplot(
+    tibble(props = sample_props()),
+    aes(x = props)
+  ) +
+    geom_histogram(
+      binwidth = bin_width,
+      fill = flagler_teal,
+      color = flagler_darkteal,
+      boundary = -bin_width / 2
+    ) +
+    scale_x_continuous(
+      limits = c(0, 1),
+      breaks = seq(0, 1, 0.1)
+    ) +
+    labs(
+      x = paste(
+        "Sample Proportion of",
+        input$group1_name
+      ),
+      y = "Frequency"
+    ) +
+    theme_bw() +
+    theme(
+      axis.text = element_text(
+        size = 11,
+        color = "black"
+      ),
+      axis.title = element_text(
+        size = 12,
+        color = "black"
+      )
+    ) +
+    geom_vline(
+      xintercept = input$pop_prop,
+      color = flagler_primary,
+      linetype = "dashed",
+      linewidth = 1
+    ) +
+    geom_vline(
+      xintercept = mean(sample_props()),
+      color = flagler_darkteal,
+      linetype = "dashed",
+      linewidth = 1
+    ) +
+    annotate(
+      "polygon",
+      x = c(
+        input$pop_prop - 0.01,
+        input$pop_prop + 0.01,
+        input$pop_prop
+      ),
+      y = c(
+        -max_count * 0.08,
+        -max_count * 0.08,
+        -max_count * 0.02
+      ),
+      fill = flagler_primary,
+      color = flagler_primary
+    ) +
+    annotate(
+      "polygon",
+      x = c(
+        mean(sample_props()) - 0.01,
+        mean(sample_props()) + 0.01,
+        mean(sample_props())
+      ),
+      y = c(
+        -max_count * 0.08,
+        -max_count * 0.08,
+        -max_count * 0.02
+      ),
+      fill = flagler_darkteal,
+      color = flagler_darkteal
     )
 
-    plot_data <- tibble(
-      xmin = head(hist_data$breaks, -1),
-      xmax = tail(hist_data$breaks, -1),
-      frequency = hist_data$counts
-    ) |> 
+  if (input$show_normal) {
+
+    theoretical_mean <- input$pop_prop
+
+    theoretical_sd <- sqrt(
+      input$pop_prop *
+        (1 - input$pop_prop) /
+        input$sample_size
+    )
+
+    x_vals <- seq(
+      max(
+        0,
+        theoretical_mean - 4 * theoretical_sd
+      ),
+      min(
+        1,
+        theoretical_mean + 4 * theoretical_sd
+      ),
+      length.out = 1000
+    )
+
+    normal_curve <- tibble(
+      x = x_vals
+    ) |>
       mutate(
-        tooltip = paste0("Sample Proportion: ", sprintf("%.3f", xmin), " to ", sprintf("%.3f", xmax), "\nFrequency: ", frequency),
-        data_id = row_number()
+        y = dnorm(
+          x,
+          mean = theoretical_mean,
+          sd = theoretical_sd
+        ) *
+          length(sample_props()) *
+          bin_width
       )
 
-    max_count <- max(plot_data$frequency)
-
-    p <- ggplot() +
-      geom_rect_interactive(
-        data = plot_data,
-        aes(xmin = xmin, xmax = xmax, ymin = 0, ymax = frequency, tooltip = tooltip, data_id = data_id),
-        fill = flagler_teal,
-        color = flagler_darkteal
-      ) +
-      scale_x_continuous(
-        limits = c(0, 1),
-        breaks = seq(0, 1, 0.1)
-      ) +
-      labs(
-        x = paste(
-          "Sample Proportion of",
-          input$group1_name
+    p <- p +
+      geom_line(
+        data = normal_curve,
+        aes(
+          x = x,
+          y = y
         ),
-        y = "Frequency"
-      ) +
-      theme_bw() +
-      theme(
-        axis.text = element_text(size = 11, color = 'black'),
-        axis.title = element_text(size = 12, color = 'black')
-      ) +
-      geom_vline(
-        xintercept = input$pop_prop,
-        color = flagler_primary,
-        linetype = 'dashed',
-        linewidth = 1
-      ) +
-      geom_vline(
-        xintercept = mean(sample_props()),
-        color = flagler_darkteal,
-        linetype = 'dashed',
-        linewidth = 1
-      ) +
-      annotate(
-        "polygon",
-        x = c(
-          input$pop_prop - 0.01,
-          input$pop_prop + 0.01,
-          input$pop_prop
-        ),
-        y = c(
-          -max_count * 0.08,
-          -max_count * 0.08,
-          -max_count * 0.02
-        ),
-        fill = flagler_primary,
-        color = flagler_primary
-      ) +
-      annotate(
-        "polygon",
-        x = c(
-          mean(sample_props()) - 0.01,
-          mean(sample_props()) + 0.01,
-          mean(sample_props())
-        ),
-        y = c(
-          -max_count * 0.08,
-          -max_count * 0.08,
-          -max_count * 0.02
-        ),
-        fill = flagler_darkteal,
-        color = flagler_darkteal
+        color = "black",
+        linewidth = 1.5,
+        alpha = 0.9
       )
-    if (input$show_normal) {
-      theoretical_mean <- input$pop_prop
+  }
 
-      theoretical_sd <- sqrt(input$pop_prop * (1 - input$pop_prop) / input$sample_size)
+  p
+})
 
-      num_points <- max(500, 1000)
-      range_multiplier <- max(3, 4)
 
-      x_min <- max(0, theoretical_mean - range_multiplier * theoretical_sd)
+# Create the samples table using reactable
+output$samples_table <- renderReactable({
 
-      x_max <- min(1, theoretical_mean + range_multiplier * theoretical_sd)
+  req(
+    sample_props(),
+    sample_counts(),
+    sample_outcomes()
+  )
 
-      x_vals <- seq(x_min, x_max, length.out = num_points)
-
-      normal_curve <- tibble(x = x_vals) |> 
-        mutate(
-          y = dnorm(x, mean = theoretical_mean, sd = theoretical_sd) * length(sample_props()) * bin_width
-        )
-
-      p <- p +
-        geom_line(
-          data = normal_curve,
-          aes(x = x, y = y),
-          color = "black",
-          linewidth = 1.5,
-          alpha = 0.9
-        )
-    }
-
-    girafe(
-      ggobj = p,
-      width_svg = 10,
-      height_svg = 5,
-      options = list(
-        opts_hover(
-          css = paste0(
-            "fill:", flagler_primary, ";",
-            "stroke:", flagler_darkteal, ";",
-            "cursor:pointer;"
-          )
-        )
-        )
-      )
-    })
-
-    # Create the samples table using reactable
-    output$samples_table <- renderReactable({
-
-      req(
-        sample_props(),
-        sample_counts(),
-        sample_outcomes()
-      )
-
-      table_data <- tibble(
-        Sample_Num = seq_along(sample_props()),
-        Outcomes = unlist(sample_outcomes()),
-        Group1_Count = sample_counts(),
-        Sample_Proportion = sample_props()
-      ) |> 
-        mutate(
-        Group2_Count = input$sample_size - Group1_Count
-      ) |> 
-      dplyr::select(Sample_Num, Outcomes, Group1_Count, Group2_Count, Sample_Proportion)
-
-    col_names <- list(
-      Sample_Num = "Sample #",
-      Outcomes = "Sample Outcome",
-      Group1_Count =
-        paste(
-          input$group1_name,
-          "Count"
-        ),
-      Group2_Count =
-        paste(
-          input$group2_name,
-          "Count"
-        ),
-      Sample_Proportion =
-        paste(
-          "Proportion of",
-          input$group1_name
-        )
+  table_data <- tibble(
+    Sample_Num = seq_along(sample_props()),
+    Outcomes = unlist(sample_outcomes()),
+    Group1_Count = sample_counts(),
+    Sample_Proportion = sample_props()
+  ) |>
+    mutate(
+      Group2_Count = input$sample_size - Group1_Count
+    ) |>
+    dplyr::select(
+      Sample_Num,
+      Outcomes,
+      Group1_Count,
+      Group2_Count,
+      Sample_Proportion
     )
 
-    reactable(
-      table_data,
+  col_names <- list(
+    Sample_Num = "Sample #",
+    Outcomes = "Sample Outcome",
+    Group1_Count = paste(
+      input$group1_name,
+      "Count"
+    ),
+    Group2_Count = paste(
+      input$group2_name,
+      "Count"
+    ),
+    Sample_Proportion = paste(
+      "Proportion of",
+      input$group1_name
+    )
+  )
 
-      columns = list(
-        Sample_Num = colDef(
-          name = col_names$Sample_Num,
-          align = "center",
-          width = 90
-        ),
+  reactable(
+    table_data,
 
-        Outcomes = colDef(
-          name = col_names$Outcomes,
-          align = "left",
-          minWidth = 280,
-          style = list(
-            fontSize = "11px",
-            fontFamily = "monospace",
-            whiteSpace = "nowrap"
-          )
-        ),
+    columns = list(
+      Sample_Num = colDef(
+        name = col_names$Sample_Num,
+        align = "center",
+        width = 90
+      ),
 
-        Group1_Count = colDef(
-          name = col_names$Group1_Count,
-          align = "center",
-          width = 120
-        ),
-
-        Group2_Count = colDef(
-          name = col_names$Group2_Count,
-          align = "center",
-          width = 120
-        ),
-
-        Sample_Proportion = colDef(
-          name = col_names$Sample_Proportion,
-          align = "center",
-          width = 150,
-          format = colFormat(
-            digits = 4
-          )
+      Outcomes = colDef(
+        name = col_names$Outcomes,
+        align = "left",
+        minWidth = 280,
+        style = list(
+          fontSize = "11px",
+          fontFamily = "monospace",
+          whiteSpace = "nowrap"
         )
       ),
 
-      defaultPageSize = 100,
-      height = 320,
-      striped = TRUE,
-      bordered = TRUE,
-      searchable = FALSE
-    )
-  })
+      Group1_Count = colDef(
+        name = col_names$Group1_Count,
+        align = "center",
+        width = 120
+      ),
+
+      Group2_Count = colDef(
+        name = col_names$Group2_Count,
+        align = "center",
+        width = 120
+      ),
+
+      Sample_Proportion = colDef(
+        name = col_names$Sample_Proportion,
+        align = "center",
+        width = 150,
+        format = colFormat(
+          digits = 4
+        )
+      )
+    ),
+
+    defaultPageSize = 100,
+    height = 320,
+    striped = TRUE,
+    bordered = TRUE,
+    searchable = FALSE
+  )
+})
 }
 
 shinyApp(
