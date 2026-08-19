@@ -126,8 +126,6 @@ ui <- page_sidebar(
       placeholder = "e.g., Failure"
     ),
 
-    hr(),
-
     numericInput(
       "pop_prop",
       "Population Proportion (Group 1):",
@@ -160,15 +158,15 @@ ui <- page_sidebar(
       "Generate Samples",
       class = "btn-primary",
       width = "100%"
-    ),
-
-    hr(),
-
-    checkboxInput(
-      "show_normal",
-      "Show Normal Curve",
-      value = TRUE
     )
+
+    # hr(),
+
+    # checkboxInput(
+    #   "show_normal",
+    #   "Show Normal Curve",
+    # value = TRUE
+    # )
   ),
 
   # Main plot area with overlaid cards
@@ -457,9 +455,9 @@ output$distribution_plot <- renderPlot({
     axis.title = element_text(size = 12)
   )
 
-  if (input$show_normal) {
-    theoretical_mean <- input$pop_prop
-  }
+  #if (input$show_normal) {
+  #  theoretical_mean <- input$pop_prop
+  #}
 
   p
 })
