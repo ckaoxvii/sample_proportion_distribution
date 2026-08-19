@@ -1,5 +1,6 @@
 library(bslib)
-library(tidyverse)
+library(dplyr)
+library(ggplot2)
 library(reactable)
 library(shiny)
 
@@ -283,6 +284,7 @@ server <- function(input, output, session) {
   sample_props    <- reactiveVal(NULL)
   sample_counts   <- reactiveVal(NULL)
   sample_outcomes <- reactiveVal(NULL)
+  simulation_n <- reactiveVal(NULL)
 
   # Update population proportion label dynamically
   observe({
@@ -336,18 +338,21 @@ server <- function(input, output, session) {
   # Generate initial data
   observe({
     if (is.null(sample_props())) {
+      n <- input$sample_size
+
       simulation <- tibble(
-        count = rbinom(input$num_samples, input$sample_size, input$pop_prop)
+        count = rbinom(input$num_samples, n, input$pop_prop)
       ) |> 
-      mutate(proportion = count / input$sample_size)
+      mutate(proportion = count / n)
 
       sample_counts(simulation$count)
       sample_props(simulation$proportion)
+      simulation_n(n)
 
       sample_outcomes(
         make_outcomes_strings(
           input$num_samples,
-          input$sample_size,
+          n,
           input$pop_prop,
           input$group1_name,
           input$group2_name
@@ -358,20 +363,23 @@ server <- function(input, output, session) {
 
   # Run simulation when button is clicked
   observeEvent(input$simulate, {
+    n <- input$sample_size
+
     simulation <- tibble(
-      count = rbinom(input$num_samples, input$sample_size, input$pop_prop)
+      count = rbinom(input$num_samples, n, input$pop_prop)
     ) |> 
     mutate(
-      proportion = count / input$sample_size
+      proportion = count / n
     )
 
     sample_counts(simulation$count)
     sample_props(simulation$proportion)
+    simulation_n(n)
 
     sample_outcomes(
       make_outcomes_strings(
         input$num_samples,
-        input$sample_size,
+        n,
         input$pop_prop,
         input$group1_name,
         input$group2_name
@@ -391,150 +399,66 @@ server <- function(input, output, session) {
 
 # Create the main plot
 output$distribution_plot <- renderPlot({
-
   req(sample_props())
 
-  bin_width <- 1 / input$sample_size
+  # distance between possible sample proportions
+  prop_spacing <- 1 / simulation_n()
 
-  hist_data <- hist(
-    sample_props(),
-    breaks = seq(
-      -bin_width / 2,
-      1 + bin_width / 2,
-      by = bin_width
-    ),
-    plot = FALSE
-  )
-
+  # count how often each sample proportion occurs
   plot_data <- tibble(
-    xmin = head(hist_data$breaks, -1),
-    xmax = tail(hist_data$breaks, -1),
-    frequency = hist_data$counts
-  )
+    sample_proportion = sample_props()
+  ) |> 
+    count(
+      sample_proportion,
+      name = 'frequency'
+    )
 
   max_count <- max(plot_data$frequency)
 
+  sample_mean <- mean(sample_props())
+
   p <- ggplot(
-    tibble(props = sample_props()),
-    aes(x = props)
+    plot_data,
+    aes(x = sample_proportion, y = frequency)
   ) +
-    geom_histogram(
-      binwidth = bin_width,
-      fill = flagler_teal,
-      color = flagler_darkteal,
-      boundary = -bin_width / 2
-    ) +
-    scale_x_continuous(
-      limits = c(0, 1),
-      breaks = seq(0, 1, 0.1)
-    ) +
-    labs(
-      x = paste(
-        "Sample Proportion of",
-        input$group1_name
-      ),
-      y = "Frequency"
-    ) +
-    theme_bw() +
-    theme(
-      axis.text = element_text(
-        size = 11,
-        color = "black"
-      ),
-      axis.title = element_text(
-        size = 12,
-        color = "black"
-      )
-    ) +
-    geom_vline(
-      xintercept = input$pop_prop,
-      color = flagler_primary,
-      linetype = "dashed",
-      linewidth = 1
-    ) +
-    geom_vline(
-      xintercept = mean(sample_props()),
-      color = flagler_darkteal,
-      linetype = "dashed",
-      linewidth = 1
-    ) +
-    annotate(
-      "polygon",
-      x = c(
-        input$pop_prop - 0.01,
-        input$pop_prop + 0.01,
-        input$pop_prop
-      ),
-      y = c(
-        -max_count * 0.08,
-        -max_count * 0.08,
-        -max_count * 0.02
-      ),
-      fill = flagler_primary,
-      color = flagler_primary
-    ) +
-    annotate(
-      "polygon",
-      x = c(
-        mean(sample_props()) - 0.01,
-        mean(sample_props()) + 0.01,
-        mean(sample_props())
-      ),
-      y = c(
-        -max_count * 0.08,
-        -max_count * 0.08,
-        -max_count * 0.02
-      ),
-      fill = flagler_darkteal,
-      color = flagler_darkteal
-    )
+  geom_col(
+    width = prop_spacing * 0.80,
+    fill = flagler_teal,
+    color = flagler_darkteal,
+    linewidth = 0.4
+  ) +
+  scale_x_continuous(
+    limits = c(0, 1),
+    breaks = seq(0, 1, 0.1),
+    expand = expansion(mult = c(0.01, 0.01))
+  ) +
+  scale_y_continuous(
+    expand = expansion(mult = c(0, 0.05))
+  ) +
+  labs(
+    x = paste("Sample Proportion of", input$group1_name),
+    y = "Frequency"
+  ) +
+  geom_vline(
+    xintercept = input$pop_prop,
+    color = flagler_primary,
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  geom_vline(
+    xintercept = sample_mean,
+    color = flagler_gold,
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  theme_bw() +
+  theme(
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
 
   if (input$show_normal) {
-
     theoretical_mean <- input$pop_prop
-
-    theoretical_sd <- sqrt(
-      input$pop_prop *
-        (1 - input$pop_prop) /
-        input$sample_size
-    )
-
-    x_vals <- seq(
-      max(
-        0,
-        theoretical_mean - 4 * theoretical_sd
-      ),
-      min(
-        1,
-        theoretical_mean + 4 * theoretical_sd
-      ),
-      length.out = 1000
-    )
-
-    normal_curve <- tibble(
-      x = x_vals
-    ) |>
-      mutate(
-        y = dnorm(
-          x,
-          mean = theoretical_mean,
-          sd = theoretical_sd
-        ) *
-          length(sample_props()) *
-          bin_width
-      )
-
-    p <- p +
-      geom_line(
-        data = normal_curve,
-        aes(
-          x = x,
-          y = y
-        ),
-        color = "black",
-        linewidth = 1.5,
-        alpha = 0.9
-      )
   }
 
   p
@@ -557,7 +481,7 @@ output$samples_table <- renderReactable({
     Sample_Proportion = sample_props()
   ) |>
     mutate(
-      Group2_Count = input$sample_size - Group1_Count
+      Group2_Count = simulation_n() - Group1_Count
     ) |>
     dplyr::select(
       Sample_Num,
