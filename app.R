@@ -86,7 +86,7 @@ ui <- page_sidebar(
 
           /* Reactable header */
           .rt-thead .rt-th {
-            background-color: %5$s !important;
+            background-color: %1$s !important;
             color: white !important;
             font-weight: 600;
           }
@@ -170,109 +170,142 @@ ui <- page_sidebar(
   ),
 
   # Main plot area with overlaid cards
-  div(
-    style = "position: relative; height: 500px;",
+  # div(
+  #   style = "position: relative; height: 500px;",
 
-    card(
-      card_header(
-        "Distribution of Sample Proportions",
-        style = paste0(
-          "background-color: ", flagler_primary,
-          "; color: white;"
-        )
-      ),
+  #   card(
+  #     card_header(
+  #       "Distribution of Sample Proportions",
+  #       style = paste0(
+  #         "background-color: ", flagler_primary,
+  #         "; color: white;"
+  #       )
+  #     ),
+
+  #     plotOutput(
+  #       "distribution_plot",
+  #       height = "400px"
+  #     ),
+
+  #     style = "height: 500px;"
+  #   ),
+
+  #   div(
+  #     style = paste0(
+  #       "position: absolute;",
+  #       " top: 60px;",
+  #       " right: 60px;",
+  #       " z-index: 10;",
+  #       " width: 200px;"
+  #     ),
+
+  #     card(
+  #       div(
+  #         style = paste0(
+  #           "text-align: center;",
+  #           " padding: 8px;",
+  #           " border-bottom: 1px solid black;"
+  #         ),
+
+  #         h5(
+  #           textOutput(
+  #             "pop_prop_display",
+  #             inline = TRUE
+  #           ),
+  #           style = paste0(
+  #             "color: ", flagler_primary,
+  #             "; margin: 0;"
+  #           )
+  #         ),
+
+  #         p(
+  #           "Population Proportion",
+  #           style = paste0(
+  #             "margin: 2px 0 0 0;",
+  #             " font-size: 11px;",
+  #             " color: black;"
+  #           )
+  #         )
+  #       ),
+
+  #       div(
+  #         style = "text-align: center; padding: 8px;",
+
+  #         h5(
+  #           textOutput(
+  #             "sample_mean_display",
+  #             inline = TRUE
+  #           ),
+  #           style = paste0(
+  #             "color: ", flagler_teal,
+  #             "; margin: 0;"
+  #           )
+  #         ),
+
+  #         p(
+  #           "Mean Sample Proportion",
+  #           style = paste0(
+  #             "margin: 2px 0 0 0;",
+  #             " font-size: 11px;",
+  #             " color: black;"
+  #           )
+  #         )
+  #       ),
+
+  #       style = paste0(
+  #         "background-color: rgba(255,255,255,0.95);",
+  #         " border: 2px solid black;",
+  #         " border-radius: 8px;",
+  #         " box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+  #       )
+  #     )
+  #   )
+  # ),
+
+  # # Sample outcomes table
+  # card(
+  #   card_header(
+  #     "Sample Outcomes",
+  #     style = paste0(
+  #       "background-color: ", flagler_primary,
+  #       "; color: white;"
+  #     )
+  #   ),
+
+  #   reactableOutput("samples_table")
+  # )
+
+  layout_column_wrap(
+    value_box(
+      title = "Population Proportion",
+      value = textOutput("pop_prop_display")
+    ),
+    value_box(
+      title = "Mean Sample Proportion",
+      value = textOutput("sample_mean_display")
+    ),
+    value_box(
+      title = 'Standard Error',
+      value = textOutput("standard_error")
+    )
+  ),
+
+  navset_card_tab(
+    nav_panel(
+      title = "Distribution of Sample Proportions",
 
       plotOutput(
         "distribution_plot",
         height = "400px"
       ),
-
-      style = "height: 500px;"
+      full_page = TRUE
     ),
+    nav_panel(
+      title = "Sample Outcomes",
 
-    div(
-      style = paste0(
-        "position: absolute;",
-        " top: 60px;",
-        " right: 60px;",
-        " z-index: 10;",
-        " width: 200px;"
-      ),
-
-      card(
-        div(
-          style = paste0(
-            "text-align: center;",
-            " padding: 8px;",
-            " border-bottom: 1px solid black;"
-          ),
-
-          h5(
-            textOutput(
-              "pop_prop_display",
-              inline = TRUE
-            ),
-            style = paste0(
-              "color: ", flagler_primary,
-              "; margin: 0;"
-            )
-          ),
-
-          p(
-            "Population Proportion",
-            style = paste0(
-              "margin: 2px 0 0 0;",
-              " font-size: 11px;",
-              " color: black;"
-            )
-          )
-        ),
-
-        div(
-          style = "text-align: center; padding: 8px;",
-
-          h5(
-            textOutput(
-              "sample_mean_display",
-              inline = TRUE
-            ),
-            style = paste0(
-              "color: ", flagler_teal,
-              "; margin: 0;"
-            )
-          ),
-
-          p(
-            "Mean Sample Proportion",
-            style = paste0(
-              "margin: 2px 0 0 0;",
-              " font-size: 11px;",
-              " color: black;"
-            )
-          )
-        ),
-
-        style = paste0(
-          "background-color: rgba(255,255,255,0.95);",
-          " border: 2px solid black;",
-          " border-radius: 8px;",
-          " box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
-        )
-      )
-    )
-  ),
-
-  # Sample outcomes table
-  card(
-    card_header(
-      "Sample Outcomes",
-      style = paste0(
-        "background-color: ", flagler_primary,
-        "; color: white;"
-      )
+      reactableOutput("samples_table")
     ),
-
-    reactableOutput("samples_table")
+    full_screen = TRUE
   )
 )
 
@@ -283,6 +316,7 @@ server <- function(input, output, session) {
   sample_counts   <- reactiveVal(NULL)
   sample_outcomes <- reactiveVal(NULL)
   simulation_n <- reactiveVal(NULL)
+  standard_error <- reactiveVal(NULL)
 
   # Update population proportion label dynamically
   observe({
@@ -346,6 +380,7 @@ server <- function(input, output, session) {
       sample_counts(simulation$count)
       sample_props(simulation$proportion)
       simulation_n(n)
+      
 
       sample_outcomes(
         make_outcomes_strings(
@@ -385,7 +420,7 @@ server <- function(input, output, session) {
     )
   })
 
-  # Display values for the info box
+  # value boxes data
   output$pop_prop_display <- renderText({
     round(input$pop_prop, 3)
   })
@@ -393,6 +428,14 @@ server <- function(input, output, session) {
   output$sample_mean_display <- renderText({
     req(sample_props())
     round(mean(sample_props()), 3)
+  })
+
+  output$standard_error <- renderText({
+    req(simulation_n())
+
+    se <- sqrt(input$pop_prop * (1 - input$pop_prop) / simulation_n())
+
+    round(se, 4)
   })
 
 # Create the main plot
@@ -550,7 +593,7 @@ output$samples_table <- renderReactable({
     ),
 
     defaultPageSize = 100,
-    height = 320,
+    height = 400,
     striped = TRUE,
     bordered = TRUE,
     searchable = FALSE
